@@ -1,5 +1,16 @@
 Revision history for Perl extension Convert::TNEF.
 
+0.02  Mon Dec 12 17:30:00 1999
+        - fixed and cleaned up some of the debug output.
+        - had the bright idea in the first release of including a
+          name() method for attachments and put it in the documentation,
+          but neglected to actually include the method in the code.
+        - Found out that the 'AttachTitle' attribute returns only the
+          short (8 char + 3 char extension) version of the filename, so I
+          included a 'longname' method which does its best to get the long
+          version of the filename. This is extracted out of the 'Attachment'
+          attribute data, which is a binary field, and I don't really know
+          how to parse this field, but this seems to work to get the name.
 0.01  Mon Nov 29 14:26:32 1999
 	- original version; created by h2xs 1.18
 

@@ -43,7 +43,7 @@ require AutoLoader;
 
 @ISA = qw(Exporter AutoLoader);
 
-$VERSION = '0.01';
+$VERSION = '0.02';
 
 # Preloaded methods go here.
 
@@ -137,7 +137,7 @@ $g_file_cnt=0;
 sub mk_fname {
  my $parms = shift;
  File::Spec->catfile($parms->{output_dir},
-                     $parms->{output_prefix}."-".$$."-".++$g_file_cnt);
+                     $parms->{output_prefix}."-".$$."-".++$g_file_cnt.".doc");
 }
 
 sub rtn_err {
@@ -149,10 +149,11 @@ sub rtn_err {
   $fh->read($data, $read_size);
   print "Error: $errstr\n";
   print "Data:\n";
-  print $1,"\n" while $data =~ /(.{0,$parms->{debug_max_line_size}})\n?/g;
+  print $1,"\n"
+   while $data =~ /([^\r\n]{0,$parms->{debug_max_line_size}})\r?\n?/g;
   print "HData:\n";
   my $hdata = unpack("H*",$data);
-  print $1,"\n" while $hdata =~ /(.{0,$parms->{debug_max_line_size}})\n?/g;
+  print $1,"\n" while $hdata =~ /(.{0,$parms->{debug_max_line_size}})/g;
  }
  return undef;
 }
@@ -199,6 +200,7 @@ __END__
  $attribute_value      = $attachments[$i]->data($att_attribute_name);
  $attribute_value_size = $attachments[$i]->size($att_attribute_name);
  $attachment_name = $attachments[$i]->name;
+ $long_attachment_name = $attachments[$i]->longname;
 
  $datahandle = $attachments[$i]->datahandle($att_attribute_name);
 
@@ -231,10 +233,11 @@ __END__
  to hex (default: false).
 
  display_after_err - If debug is true and an error is encountered,
- displays this many bytes of data following the error (default: 32).
+ reads and displays this many bytes of data following the error
+ (default: 32).
 
- debug_max_display - If debug is true then at most this many bytes of data
- will be displayed for each TNEF attribute (default: 1024).
+ debug_max_display - If debug is true then read and display at most
+ this many bytes of data for each TNEF attribute (default: 1024).
 
  debug_max_line_size - If debug is true then at most this many bytes of
  data will be displayed on each line for each TNEF attribute
@@ -277,7 +280,12 @@ __END__
  is assumed, which is probably the data you're looking for.
 
  name() is the same as data(), except the attribute 'AttachTitle' is
- assumed, which should be the name of your attachment.
+ assumed, which returns the 8 character + 3 character extension name of
+ the attachment.
+
+ longname() returns the long filename and extension of an attachment. This
+ is embedded in the 'Attachment' attribute data, so we attempt to extract
+ the name out of that.
 
  size() takes an TNEF attribute name, and returns the size in bytes for
  the data for that attachment attribute.
@@ -421,13 +429,14 @@ perl(1), IO::Wrap(3), MIME::Parser(3), MIME::Entity(3), MIME::Body(3)
 
 =head1 CAVEATS
 
-The parsing may depend on the endianness (see perlport) and width of
-integers on the system where the TNEF file was created. If this proves
-to be the case, I'll try to fix it in the next release.
+ The parsing may depend on the endianness (see perlport) and width of
+ integers on the system where the TNEF file was created. If this proves
+ to be the case (check the debug output), I'll see what I can do
+ about it.
 
 =head1 AUTHOR
 
-Douglas Wilson, dwilson@gtemail.net
+ Douglas Wilson, dwilson@gtemail.net
 
 =cut
 
@@ -668,10 +677,11 @@ sub debug_print {
    print "AttachRendData: $data\n";
   } else {
    print "Data:\n";
-   print $1,"\n" while $data =~ /(.{0,$parms->{debug_max_line_size}})\n?/g;
+   print $1,"\n"
+    while $data =~ /([^\r\n]{0,$parms->{debug_max_line_size}})\r?\n?/g;
    print "HData:\n";
    my $hdata = unpack("H*",$data);
-   print $1,"\n" while $hdata =~ /(.{0,$parms->{debug_max_line_size}})\n?/g;
+   print $1,"\n" while $hdata =~ /(.{0,$parms->{debug_max_line_size}})/g;
   }
  } else {
   my $io=$data->open("r") or croak "Error opening attachment data handle: $!";
@@ -679,10 +689,11 @@ sub debug_print {
   $io->read($buffer, $parms->{debug_max_display});
   $io->close or croak "Error closing attachment data handle: $!";
   print "Data:\n";
-  print $1,"\n" while $data =~ /(.{0,$parms->{debug_max_line_size}})\n?/sg;
+  print $1,"\n"
+   while $buffer =~ /([^\r\n]{0,$parms->{debug_max_line_size}})\r?\n?/sg;
   print "HData:\n";
-  my $hdata = unpack("H*",$data);
-  print $1,"\n" while $hdata =~ /(.{0,$parms->{debug_max_line_size}})\n?/sg;
+  my $hdata = unpack("H*",$buffer);
+  print $1,"\n" while $hdata =~ /(.{0,$parms->{debug_max_line_size}})/g;
  }
 }
 
@@ -753,6 +764,24 @@ sub data {
  my $self = shift;
  my $attr = shift || 'AttachData';
  return $self->{$attr}->data;
+}
+
+sub name {
+ my $self = shift;
+ my $attr = shift || 'AttachTitle';
+ return $self->{$attr}->data;
+}
+
+sub longname {
+ my $self = shift;
+ my $name = $self->name;
+ my ($prfx, $ext) = $name =~ /(.{6})~\d(\..{0,3})/;
+ return $name unless defined $prfx;
+
+ my $data = $self->data("Attachment");
+ my ($longname) = $data =~ /\x00(\Q$prfx\E[^\x00]+\Q$ext\E)\x00/i;
+ return $longname || $name;
+
 }
 
 sub datahandle {
