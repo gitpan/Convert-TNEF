@@ -1,5 +1,15 @@
 Revision history for Perl extension Convert::TNEF.
 
+0.06  Thu Jun 15 2000
+        - size() method is fixed.
+        - data(), name() and longname() methods will now return the
+          undefined value if the data does not exist in the attachment.
+        - Not a change, just a realization that the TNEF 'attAttachment'
+          attribute where the long filename and display name resides is
+          really a series of MAPI properties. Maybe there ought to be a
+          MAPI module to parse it? Currently, the longname() attribute is
+          returning the MAPI display name property. See previous changes
+          for why.
 0.05  Tue May 16 16:30:00 2000
         - Both name() and longname() now strip trailing null characters. This
           doesn't seem to make a difference when creating a file, but it does

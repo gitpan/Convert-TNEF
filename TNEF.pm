@@ -29,7 +29,7 @@ use MIME::Body;
 # We're not exporting anything
 
 use AutoLoader qw(AUTOLOAD);
-$VERSION = '0.05';
+$VERSION = '0.06';
 
 # Set some TNEF constants. Everything turned
 # out to be in little endian order, so I just added
@@ -519,7 +519,6 @@ sub read {
  return rtn_err("Not an attachment", $fd, $parms) unless $is_eof or $is_att;
 
  my @atts=();
- my @atts_size=();
  my %attachment=();
  my %attachment_size=();
  while ($is_att) {
@@ -585,11 +584,10 @@ sub read {
   $is_eof = ($num_bytes < 1);
  }
  if (%attachment) {
-  my $attref = {%attachment};
-  my $attsiz = {%attachment_siz};
+  my $attref = \%attachment;
+  $attref->{TN_Size} = \%attachment_size;
   bless $attref, $class;
   push(@atts, $attref);
-  push(@atts_size, $attsiz);
  }
 
  return rtn_err("Message found in attachment section",$fd,$parms)
@@ -706,13 +704,13 @@ sub attachments {
 sub data {
  my $self = shift;
  my $attr = shift || 'AttachData';
- return $self->{$attr}->data;
+ return $self->{$attr} && $self->{$attr}->data;
 }
 
 sub name {
  my $self = shift;
  my $attr = shift || 'AttachTitle';
- my $name = $self->{$attr}->data;
+ my $name = $self->{$attr} && $self->{$attr}->data;
  $name =~ s/\x00+$// if $name;
  return $name;
 }
@@ -723,6 +721,7 @@ sub longname {
  my $self = shift;
 
  my $data = $self->data("Attachment");
+ return unless $data;
  my $pos = index($data, pack("H*", "1e00013001"));
  return $self->name unless $pos >= 0;
  my $len = unpack("V", substr($data, $pos+8, 4));
