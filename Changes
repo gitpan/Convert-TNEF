@@ -1,5 +1,7 @@
 Revision history for Perl extension Convert::TNEF.
 
+0.12  Tue May 29 2001
+        - We're not using Autoloader, so no need to 'use' it.
 0.11  Tue May 29 2001
         - Moved previously 'autoload' functions so that they're all
           just loaded. Its a small module anyway, so there was no real
