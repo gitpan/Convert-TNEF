@@ -1,6 +1,6 @@
 # Convert::TNEF.pm
 #
-# Copyright (c) 1999 Douglas Wilson <dwilson@gtemail.net>. All rights reserved.
+# Copyright (c) 1999 Douglas Wilson <dougw@cpan.org>. All rights reserved.
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl itself.
 
@@ -9,7 +9,7 @@ package Convert::TNEF;
 use strict;
 use integer;
 use vars qw(
- @ISA @EXPORT @EXPORT_OK $VERSION
+ $VERSION
  $TNEF_SIGNATURE
  $TNEF_PURE
  $LVL_MESSAGE
@@ -27,9 +27,7 @@ use IO::Wrap;
 use File::Spec;
 use MIME::Body;
 
-# We're not exporting anything
-
-$VERSION = '0.12';
+$VERSION = '0.14';
 
 # Set some TNEF constants. Everything turned
 # out to be in little endian order, so I just added
@@ -236,14 +234,16 @@ sub read {
  return rtn_err("Neither a message or an attachment", $fd, $parms)
   unless $is_msg or $is_att;
 
- my %msg=();
- my %msg_size=();
  my $is_eof = 0;
+ my $msg = Convert::TNEF::Data->new;
+ # Should probably try to combine this message loop
+ # with the Attachment loop
  while ($is_msg) {
   print "Message attribute\n" if $is_msg and $debug;
   $num_bytes = $fd->read($data, 4);
   return read_err($num_bytes,$fd,$!) unless equal($num_bytes,4);
   my $att_id = $data;
+  my $att_name = $att_name{$att_id};
 
   print "TNEF message attribute: ",unpack("H*", $data),"\n" if $debug;
   return rtn_err("Bad Attribute found in Message", $fd, $parms)
@@ -270,7 +270,8 @@ sub read {
   my $calc_chksum;
   $data=$self->build_data($fd, $length, \$calc_chksum, $parms) or return undef;
   $self->debug_print($length, $att_id, $data, $parms) if $debug;
-  $msg{$att_name{$att_id}} = $data;
+  $msg->datahandle($att_name, $data);
+  $msg->size($att_name, $length);
 
   $num_bytes = $fd->read($data, 2);
   return read_err($num_bytes,$fd,$!) unless equal($num_bytes,2);
@@ -295,8 +296,6 @@ sub read {
 
  my @atts=();
  my $attch_cnt = -1;
- my %attachment=();
- my %attachment_size=();
  while ($is_att) {
   print "Attachment attribute\n" if $debug;
 
@@ -328,9 +327,9 @@ sub read {
   $self->debug_print($length, $att_id, $data, $parms) if $debug;
 
   # See if we're starting a new attachment then save the data
-  $atts[++$attch_cnt] = bless {}, $class if $att_name eq "AttachRenddata";
-  $atts[$attch_cnt]{$att_name} = $data;
-  $atts[$attch_cnt]{TN_Size}{$att_name} = $length;
+  $atts[++$attch_cnt]=Convert::TNEF::Data->new if $att_name eq "AttachRenddata";
+  $atts[$attch_cnt]->datahandle($att_name, $data);
+  $atts[$attch_cnt]->size($att_name, $length);
 
   # Validate checksum
   $num_bytes = $fd->read($data, 2);
@@ -357,9 +356,6 @@ sub read {
  return rtn_err("Not an attachment", $fd, $parms) unless $is_eof or $is_att;
  print "EOF\n" if $debug and $is_eof;
 
- $msg{TN_Size} = \%msg_size;
- my $msg = \%msg;
- bless $msg, $class;
  $self->{TN_Message} = $msg;
  $self->{TN_Attachments} = \@atts;
  return $self;
@@ -461,9 +457,19 @@ sub attachments {
  return @{$attachments};
 }
 
-# The methods from here down should really
-# be a separate class since they operate
-# on the attachment, not on the TNEF object.
+# This is for Messages or Attachments
+# since they are essentially the same thing except
+# for the leading attribute code
+package Convert::TNEF::Data;
+
+sub new {
+ my $proto = shift;
+ my $class = ref($proto) || $proto;
+ my $self = {};
+ $self->{TN_Size} = {};
+ bless $self, $class;
+}
+
 sub data {
  my $self = shift;
  my $attr = shift || 'AttachData';
@@ -496,12 +502,14 @@ sub longname {
 sub datahandle {
  my $self = shift;
  my $attr = shift || 'AttachData';
+ $self->{$attr} = shift if @_;
  return $self->{$attr};
 }
 
 sub size {
  my $self = shift;
  my $attr = shift || 'AttachData';
+ $self->{TN_Size}->{$attr} = shift if @_;
  return $self->{TN_Size}->{$attr};
 }
 # Autoload methods go after =cut, and are processed by the autosplit program.
@@ -725,6 +733,6 @@ perl(1), IO::Wrap(3), MIME::Parser(3), MIME::Entity(3), MIME::Body(3)
 
 =head1 AUTHOR
 
- Douglas Wilson, dwilson@gtemail.net
+ Douglas Wilson, dougw@cpan.org
 
 =cut
