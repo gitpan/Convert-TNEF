@@ -1,5 +1,11 @@
 Revision history for Perl extension Convert::TNEF.
 
+0.15  Tue Jul 31 2001
+        - Finally combined message and attachment parsing loops.
+        - Removed the '|| []' from the attachment() method. I'm storing
+          an arrayref unconditionally in the TNEF object, so there should
+          be no need for this. Also now returns ref if not called
+          in list context.
 0.14  Mon Jul 30 2001
         - Subclass message and attachment portions of TNEF object.
         - Found bug in saving the size of message attributes.

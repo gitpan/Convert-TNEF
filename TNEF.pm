@@ -27,7 +27,7 @@ use IO::Wrap;
 use File::Spec;
 use MIME::Body;
 
-$VERSION = '0.14';
+$VERSION = '0.15';
 
 # Set some TNEF constants. Everything turned
 # out to be in little endian order, so I just added
@@ -225,37 +225,44 @@ sub read {
  return read_err($num_bytes,$fd,$!) unless equal($num_bytes,1);
 
  my $msg_att="";
- my $got_version = 0;
  my $att_cnt=0;
 
  my $is_msg = ($data eq $LVL_MESSAGE);
  my $is_att = ($data eq $LVL_ATTACHMENT);
  print "TNEF object start: ",unpack("H*", $data),"\n" if $debug;
- return rtn_err("Neither a message or an attachment", $fd, $parms)
+ return rtn_err("Neither a message nor an attachment", $fd, $parms)
   unless $is_msg or $is_att;
 
  my $is_eof = 0;
  my $msg = Convert::TNEF::Data->new;
- # Should probably try to combine this message loop
- # with the Attachment loop
- while ($is_msg) {
-  print "Message attribute\n" if $is_msg and $debug;
+ my @atts;
+ my $ent;
+ while ($is_msg or $is_att) {
+  my $type = $is_msg ? 'message' : 'attachment';
+  print "Reading $type attribute\n" if $debug;
   $num_bytes = $fd->read($data, 4);
   return read_err($num_bytes,$fd,$!) unless equal($num_bytes,4);
   my $att_id = $data;
   my $att_name = $att_name{$att_id};
 
-  print "TNEF message attribute: ",unpack("H*", $data),"\n" if $debug;
-  return rtn_err("Bad Attribute found in Message", $fd, $parms)
+  print "TNEF $type attribute: ",unpack("H*", $data),"\n" if $debug;
+  return rtn_err("Bad Attribute found in $type", $fd, $parms)
    unless $att_name{$att_id};
   if ($att_id eq $att{TnefVersion}) {
+   return rtn_err("Version attribute found in attachment", $fd, $parms)
+    if $is_att;
    return rtn_err("Version must be first attribute in message", $fd, $parms)
     if $att_cnt;
-   return rtn_err("Two attTnefVersion records found", $fd, $parms)
-    if $got_version;
-   $got_version = 1;
+   $att_cnt++;
+   $ent = $msg;
+  } elsif ($att_id eq $att{AttachRenddata}) {
+   return rtn_err("AttachRenddata attribute found in attachment", $fd, $parms)
+    if $is_msg;
+   push @atts, ($ent = Convert::TNEF::Data->new);
+  } else {
+   return rtn_err("AttachRenddata must be first attribute", $fd, $parms)
+    if $is_att and ! @atts and $att_name ne "AttachRenddata" ;
   }
-  $att_cnt++;
   print "Got attribute:$att_name{$att_id}\n" if $debug;
 
   $num_bytes = $fd->read($data, 4);
@@ -270,8 +277,7 @@ sub read {
   my $calc_chksum;
   $data=$self->build_data($fd, $length, \$calc_chksum, $parms) or return undef;
   $self->debug_print($length, $att_id, $data, $parms) if $debug;
-  $msg->datahandle($att_name, $data);
-  $msg->size($att_name, $length);
+  $ent->datahandle($att_name, $data, $length);
 
   $num_bytes = $fd->read($data, 2);
   return read_err($num_bytes,$fd,$!) unless equal($num_bytes,2);
@@ -288,72 +294,13 @@ sub read {
   return read_err($num_bytes,$fd,$!) unless defined $num_bytes;
   print "Next token:", unpack("H2", $data), "\n" if $debug;
   $is_msg = ($data eq $LVL_MESSAGE);
+  return rtn_err("Found message data in attachment", $fd, $parms)
+   if $is_msg and $is_att;
   $is_att = ($data eq $LVL_ATTACHMENT);
-  $is_eof = ($num_bytes == 0);
+  $is_eof = ($num_bytes < 1) or
+   return rtn_err("Not a TNEF $type", $fd, $parms) unless $is_msg or $is_att;
  }
 
- return rtn_err("Not an attachment", $fd, $parms) unless $is_eof or $is_att;
-
- my @atts=();
- my $attch_cnt = -1;
- while ($is_att) {
-  print "Attachment attribute\n" if $debug;
-
-  $num_bytes = $fd->read($data, 4);
-  return read_err($num_bytes,$fd,$!) unless equal($num_bytes,4);
-  my $att_id = $data;
-  my $att_name = $att_name{$att_id};
-
-  print "TNEF attachment attribute: ",unpack("H*", $data),"\n" if $debug;
-  return rtn_err("Bad Attribute found in attachment", $fd, $parms)
-   unless $att_name;
-  return rtn_err("AttachRenddata must be first attribute", $fd, $parms)
-   if $attch_cnt < 0 and $att_name ne "AttachRenddata" ;
-  return rtn_err("Version record found in attachment", $fd, $parms)
-   if $att_id eq $att{TnefVersion};
-  print "Got attribute:$att_name\n" if $debug;
-
-  $num_bytes = $fd->read($data, 4);
-  return read_err($num_bytes,$fd,$!) unless equal($num_bytes,4);
-
-  print "HLength:", unpack("H8",$data), "\n" if $debug;
-  my $length = unpack("V", $data);
-  print "Length: $length\n" if $debug;
-
-  # Get the attribute data (returns an object since data may
-  # actually end up in a file)
-  my $calc_chksum;
-  $data=$self->build_data($fd, $length, \$calc_chksum, $parms) or return undef;
-  $self->debug_print($length, $att_id, $data, $parms) if $debug;
-
-  # See if we're starting a new attachment then save the data
-  $atts[++$attch_cnt]=Convert::TNEF::Data->new if $att_name eq "AttachRenddata";
-  $atts[$attch_cnt]->datahandle($att_name, $data);
-  $atts[$attch_cnt]->size($att_name, $length);
-
-  # Validate checksum
-  $num_bytes = $fd->read($data, 2);
-  return read_err($num_bytes,$fd,$!) unless equal($num_bytes,2);
-  my $file_chksum = $data;
-  if ($debug) {
-   print "Calc Chksum:", unpack("H*",$calc_chksum),"\n";
-   print "File Chksum:", unpack("H*",$file_chksum),"\n";
-  }
-  return rtn_err("Bad Checksum", $fd, $parms)
-   unless $calc_chksum eq $file_chksum or $ignore_checksum;
-
-  my $num_bytes=$fd->read($data, 1);
-  # EOF (0 bytes) is ok
-  return read_err($num_bytes,$fd,$!) unless defined $num_bytes;
-  print "Next token:", unpack("H2", $data), "\n" if $debug;
-  $is_msg = ($data eq $LVL_MESSAGE);
-  $is_att = ($data eq $LVL_ATTACHMENT);
-  $is_eof = ($num_bytes < 1);
- }
-
- return rtn_err("Message found in attachment section",$fd,$parms)
-  if $is_msg;
- return rtn_err("Not an attachment", $fd, $parms) unless $is_eof or $is_att;
  print "EOF\n" if $debug and $is_eof;
 
  $self->{TN_Message} = $msg;
@@ -453,8 +400,8 @@ sub message {
 
 sub attachments {
  my $self = shift;
- my $attachments = $self->{TN_Attachments} || [];
- return @{$attachments};
+ return @{ $self->{TN_Attachments} } if wantarray;
+ $self->{TN_Attachments};
 }
 
 # This is for Messages or Attachments
@@ -473,7 +420,7 @@ sub new {
 sub data {
  my $self = shift;
  my $attr = shift || 'AttachData';
- return $self->{$attr} && $self->{$attr}->data;
+ return $self->{$attr} && $self->{$attr}->as_string;
 }
 
 sub name {
@@ -503,6 +450,7 @@ sub datahandle {
  my $self = shift;
  my $attr = shift || 'AttachData';
  $self->{$attr} = shift if @_;
+ $self->size($attr, shift) if @_;
  return $self->{$attr};
 }
 
@@ -615,27 +563,27 @@ __END__
  attachment data.
 
  attachments() returns a list of the attachments that the given TNEF
- object contains.
+ object contains. Returns a list ref if not called in array context.
 
  data() takes a TNEF attribute name, and returns a string value for that 
  attribute for that attachment. Its your own problem if the string is too
  big for memory. If no argument is given, then the 'AttachData' attribute
- is assumed, which is probably the data you're looking for.
+ is assumed, which is probably the attachment data you're looking for.
 
  name() is the same as data(), except the attribute 'AttachTitle' is
- assumed, which returns the 8 character + 3 character extension name of
- the attachment.
+ the default, which returns the 8 character + 3 character extension name
+ of the attachment.
 
  longname() returns the long filename and extension of an attachment. This
- is embedded in the 'Attachment' attribute data, so we attempt to extract
- the name out of that.
+ is embedded within a MAPI property of the 'Attachment' attribute data, so
+ we attempt to extract the name out of that.
 
  size() takes an TNEF attribute name, and returns the size in bytes for
  the data for that attachment attribute.
 
  datahandle() is a method for attachments which takes a TNEF attribute
- name, and returns the data for that attribute as an object which is
- the same as a MIME::Body object.  See MIME::Body for all the applicable
+ name, and returns the data for that attribute as a handle which is
+ the same as a MIME::Body handle.  See MIME::Body for all the applicable
  methods. If no argument is given, then 'AttachData' is assumed.
 
 
