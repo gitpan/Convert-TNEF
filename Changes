@@ -1,10 +1,13 @@
 Revision history for Perl extension Convert::TNEF.
 
+0.09  Wed Jan 10 2001
+        - Fixed message method. Added more tests to test suite.
 0.08  Fri Jun 17 2000
         - Added a bit more file format error checking.
 0.07  Fri Jun 16 2000
         - Just some code cleanup in reading the attachment part of the
-          file. More efficient when more than one attachment in a file.
+          file. When there's more than one attachment in a file, it is
+          now more efficient than it used to be.
 0.06  Thu Jun 15 2000
         - size() method is fixed.
         - data(), name() and longname() methods will now return the
@@ -42,11 +45,11 @@ Revision history for Perl extension Convert::TNEF.
         - There was two purge methods. I purged one of them.
         - fixed a die() in the parse method to return a failure status instead.
         - Took out the subclasses which were just aliases for
-          for MIME::Body::*, and weren't really proper subclasses anyway.
+          MIME::Body::*, and weren't really proper subclasses anyway.
           I forget why I did it that way, maybe I planned on making some
           extra methods later, or just to see if it worked.
           There really should be separate classes for a TNEF object,
-          and for attachments in the TNEF object, maybe someday I'll
+          and for attachments/messages in the TNEF object, maybe someday I'll
           get around to it.
 0.02  Mon Dec 12 17:30:00 1999
         - fixed and cleaned up some of the debug output.
