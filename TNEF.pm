@@ -30,7 +30,7 @@ use MIME::Body;
 # We're not exporting anything
 
 use AutoLoader qw(AUTOLOAD);
-$VERSION = '0.09';
+$VERSION = '0.10';
 
 # Set some TNEF constants. Everything turned
 # out to be in little endian order, so I just added

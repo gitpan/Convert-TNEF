@@ -1,5 +1,8 @@
 Revision history for Perl extension Convert::TNEF.
 
+0.10  Wed Jan 17 2001
+        - Stripped carriage returns from all files (last edit was
+          on Windows).
 0.09  Wed Jan 10 2001
         - Fixed message method. Added more tests to test suite.
 0.08  Fri Jun 17 2000
