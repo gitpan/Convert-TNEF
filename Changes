@@ -1,5 +1,19 @@
 Revision history for Perl extension Convert::TNEF.
 
+0.17  Sun Feb 24 2001
+        - It appears that messages no longer need start with a
+          TnefVersion attribute, and a message without this attribute
+          triggered a bug ('datahandle' method called on uninitialized
+          value) found by Randy Diffenderfer.
+        - Although the MSDN TNEF Stream syntax page makes it look like
+          TnefVersion must be the first attribute if it appears, and
+          MessageClass must be the first or second attribute if it
+          appears, I'm not going to check for this because then my
+          test file has MessageClass as the third attribute.
+        - Got rid of '_equal' function. The only reason to worry about
+          warnings when comparing undef is if there's a read error, and
+          then a warning ought to be ok anyway.
+        - Long overdue perltidy format cleanup.
 0.16  Tue Jul 31 2001
         - Simplified main loop some more. Don't need to check for end
           of processing twice.
