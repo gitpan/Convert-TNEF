@@ -27,7 +27,7 @@ use IO::Wrap;
 use File::Spec;
 use MIME::Body;
 
-$VERSION = '0.15';
+$VERSION = '0.16';
 
 # Set some TNEF constants. Everything turned
 # out to be in little endian order, so I just added
@@ -56,47 +56,47 @@ for (keys %atp) {
  $atp{$_} = reverse $atp{$_};
 }
 
-sub ATT {
+sub _ATT {
  my ($att, $id) = @_;
  return reverse($id) . $att;
 }
 
 # The side comments are 'MAPI' equivalents
 %att = (
- Null     => ATT( pack('H*','0000'), pack('H4','0000')),
- From     => ATT($atp{Triples},pack('H*','8000')),# PR_ORIGINATOR_RETURN_ADDRESS
- Subject  => ATT( $atp{String}, pack('H*','8004')), # PR_SUBJECT
- DateSent => ATT( $atp{Date}, pack('H*','8005')), # PR_CLIENT_SUBMIT_TIME
- DateRecd => ATT( $atp{Date}, pack('H*','8006')), # PR_MESSAGE_DELIVERY_TIME
- MessageStatus  => ATT( $atp{Byte}, pack('H*','8007')), # PR_MESSAGE_FLAGS
- MessageClass   => ATT( $atp{Word}, pack('H*','8008')), # PR_MESSAGE_CLASS
- MessageID      => ATT( $atp{String}, pack('H*','8009')), # PR_MESSAGE_ID
- ParentID       => ATT( $atp{String}, pack('H*','800A')), # PR_PARENT_ID
- ConversationID => ATT( $atp{String}, pack('H*','800B')), # PR_CONVERSATION_ID
- Body           => ATT( $atp{Text}, pack('H*','800C')), # PR_BODY
- Priority       => ATT( $atp{Short}, pack('H*','800D')), # PR_IMPORTANCE
- AttachData     => ATT( $atp{Byte}, pack('H*','800F')), # PR_ATTACH_DATA_xxx
- AttachTitle    => ATT( $atp{String}, pack('H*','8010')), # PR_ATTACH_FILENAME
- AttachMetaFile => ATT( $atp{Byte}, pack('H*','8011')), # PR_ATTACH_RENDERING
- AttachCreateDate => ATT( $atp{Date}, pack('H*','8012')), # PR_CREATION_TIME
- AttachModifyDate => ATT( $atp{Date}, pack('H*','8013')), # PR_LAST_MODIFICATION_TIME
- DateModified => ATT($atp{Date},pack('H*','8020')),# PR_LAST_MODIFICATION_TIME
- AttachTransportFilename => ATT($atp{Byte}, pack('H*','9001')), #PR_ATTACH_TRANSPORT_NAME
- AttachRenddata => ATT( $atp{Byte}, pack('H*','9002')),
- MAPIProps   => ATT( $atp{Byte}, pack('H*','9003')),
- RecipTable  => ATT( $atp{Byte}, pack('H*','9004')), # PR_MESSAGE_RECIPIENTS
- Attachment  => ATT( $atp{Byte}, pack('H*','9005')),
- TnefVersion => ATT( $atp{Dword}, pack('H*','9006')),
- OemCodepage => ATT( $atp{Byte}, pack('H*','9007')),
- OriginalMessageClass => ATT( $atp{Word}, pack('H*','0006')), # PR_ORIG_MESSAGE_CLASS
+ Null     =>_ATT( pack('H*','0000'), pack('H4','0000')),
+ From     =>_ATT($atp{Triples},pack('H*','8000')),# PR_ORIGINATOR_RETURN_ADDRESS
+ Subject  =>_ATT( $atp{String}, pack('H*','8004')), # PR_SUBJECT
+ DateSent =>_ATT( $atp{Date}, pack('H*','8005')), # PR_CLIENT_SUBMIT_TIME
+ DateRecd =>_ATT( $atp{Date}, pack('H*','8006')), # PR_MESSAGE_DELIVERY_TIME
+ MessageStatus  =>_ATT( $atp{Byte}, pack('H*','8007')), # PR_MESSAGE_FLAGS
+ MessageClass   =>_ATT( $atp{Word}, pack('H*','8008')), # PR_MESSAGE_CLASS
+ MessageID      =>_ATT( $atp{String}, pack('H*','8009')), # PR_MESSAGE_ID
+ ParentID       =>_ATT( $atp{String}, pack('H*','800A')), # PR_PARENT_ID
+ ConversationID =>_ATT( $atp{String}, pack('H*','800B')), # PR_CONVERSATION_ID
+ Body           =>_ATT( $atp{Text}, pack('H*','800C')), # PR_BODY
+ Priority       =>_ATT( $atp{Short}, pack('H*','800D')), # PR_IMPORTANCE
+ AttachData     =>_ATT( $atp{Byte}, pack('H*','800F')), # PR_ATTACH_DATA_xxx
+ AttachTitle    =>_ATT( $atp{String}, pack('H*','8010')), # PR_ATTACH_FILENAME
+ AttachMetaFile =>_ATT( $atp{Byte}, pack('H*','8011')), # PR_ATTACH_RENDERING
+ AttachCreateDate =>_ATT( $atp{Date}, pack('H*','8012')), # PR_CREATION_TIME
+ AttachModifyDate =>_ATT( $atp{Date}, pack('H*','8013')), # PR_LAST_MODIFICATION_TIME
+ DateModified =>_ATT($atp{Date},pack('H*','8020')),# PR_LAST_MODIFICATION_TIME
+ AttachTransportFilename =>_ATT($atp{Byte}, pack('H*','9001')), #PR_ATTACH_TRANSPORT_NAME
+ AttachRenddata =>_ATT( $atp{Byte}, pack('H*','9002')),
+ MAPIProps   =>_ATT( $atp{Byte}, pack('H*','9003')),
+ RecipTable  =>_ATT( $atp{Byte}, pack('H*','9004')), # PR_MESSAGE_RECIPIENTS
+ Attachment  =>_ATT( $atp{Byte}, pack('H*','9005')),
+ TnefVersion =>_ATT( $atp{Dword}, pack('H*','9006')),
+ OemCodepage =>_ATT( $atp{Byte}, pack('H*','9007')),
+ OriginalMessageClass =>_ATT( $atp{Word}, pack('H*','0006')), # PR_ORIG_MESSAGE_CLASS
 
- Owner => ATT( $atp{Byte}, pack('H*','0000')), # PR_RCVD_REPRESENTING_xxx or PR_SENT_REPRESENTING_xxx
- SentFor => ATT( $atp{Byte}, pack('H*','0001')), # PR_SENT_REPRESENTING_xxx
- Delegate => ATT( $atp{Byte}, pack('H*','0002')), # PR_RCVD_REPRESENTING_xxx
- DateStart => ATT( $atp{Date}, pack('H*','0006')), # PR_DATE_START
- DateEnd => ATT( $atp{Date}, pack('H*','0007')), # PR_DATE_END
- AidOwner => ATT( $atp{Long}, pack('H*','0008')), # PR_OWNER_APPT_ID
- RequestRes => ATT( $atp{Short}, pack('H*','0009')), # PR_RESPONSE_REQUESTED
+ Owner =>_ATT( $atp{Byte}, pack('H*','0000')), # PR_RCVD_REPRESENTING_xxx or PR_SENT_REPRESENTING_xxx
+ SentFor =>_ATT( $atp{Byte}, pack('H*','0001')), # PR_SENT_REPRESENTING_xxx
+ Delegate =>_ATT( $atp{Byte}, pack('H*','0002')), # PR_RCVD_REPRESENTING_xxx
+ DateStart =>_ATT( $atp{Date}, pack('H*','0006')), # PR_DATE_START
+ DateEnd =>_ATT( $atp{Date}, pack('H*','0007')), # PR_DATE_END
+ AidOwner =>_ATT( $atp{Long}, pack('H*','0008')), # PR_OWNER_APPT_ID
+ RequestRes =>_ATT( $atp{Short}, pack('H*','0009')), # PR_RESPONSE_REQUESTED
 );
 
 # Create reverse lookup table
@@ -120,13 +120,13 @@ $g_file_cnt=0;
 );
 
 # Make a file name
-sub mk_fname {
+sub _mk_fname {
  my $parms = shift;
  File::Spec->catfile($parms->{output_dir},
                      $parms->{output_prefix}."-".$$."-".++$g_file_cnt.".doc");
 }
 
-sub rtn_err {
+sub _rtn_err {
  my ($errmsg, $fh, $parms) = @_;
  $errstr = $errmsg;
  if ($parms->{debug}) {
@@ -144,14 +144,14 @@ sub rtn_err {
  return undef;
 }
 
-sub read_err {
+sub _read_err {
  my ($bytes, $fh, $errmsg) = @_;
  $errstr = (defined $bytes)? "Premature EOF" : "Read Error:".$errmsg;
  return undef;
 }
 
 # I don't want any complaints about comparing undef
-sub equal {
+sub _equal {
  local $^W=0;
  $_[0] == $_[1];
 }
@@ -210,19 +210,19 @@ sub read {
  # Start of TNEF stream
  my $data;
  my $num_bytes = $fd->read($data, 4);
- return read_err($num_bytes,$fd,$!) unless equal($num_bytes,4);
+ return _read_err($num_bytes,$fd,$!) unless _equal($num_bytes,4);
  print "TNEF start: ",unpack("H*", $data),"\n" if $debug;
- return rtn_err("Not TNEF-encapsulated", $fd, $parms)
+ return _rtn_err("Not TNEF-encapsulated", $fd, $parms)
   unless $data eq $TNEF_SIGNATURE;
 
  # Key
  $num_bytes = $fd->read($data, 2);
- return read_err($num_bytes,$fd,$!) unless equal($num_bytes,2);
+ return _read_err($num_bytes,$fd,$!) unless _equal($num_bytes,2);
  print "TNEF key: ",unpack("H*", $data),"\n" if $debug;
 
  # Start of First Object
  $num_bytes = $fd->read($data, 1);
- return read_err($num_bytes,$fd,$!) unless equal($num_bytes,1);
+ return _read_err($num_bytes,$fd,$!) unless _equal($num_bytes,1);
 
  my $msg_att="";
  my $att_cnt=0;
@@ -230,43 +230,43 @@ sub read {
  my $is_msg = ($data eq $LVL_MESSAGE);
  my $is_att = ($data eq $LVL_ATTACHMENT);
  print "TNEF object start: ",unpack("H*", $data),"\n" if $debug;
- return rtn_err("Neither a message nor an attachment", $fd, $parms)
+ return _rtn_err("Neither a message nor an attachment", $fd, $parms)
   unless $is_msg or $is_att;
 
- my $is_eof = 0;
  my $msg = Convert::TNEF::Data->new;
  my @atts;
  my $ent;
- while ($is_msg or $is_att) {
+ # Read message and attachments
+ LOOP: {
   my $type = $is_msg ? 'message' : 'attachment';
   print "Reading $type attribute\n" if $debug;
   $num_bytes = $fd->read($data, 4);
-  return read_err($num_bytes,$fd,$!) unless equal($num_bytes,4);
+  return _read_err($num_bytes,$fd,$!) unless _equal($num_bytes,4);
   my $att_id = $data;
   my $att_name = $att_name{$att_id};
 
   print "TNEF $type attribute: ",unpack("H*", $data),"\n" if $debug;
-  return rtn_err("Bad Attribute found in $type", $fd, $parms)
+  return _rtn_err("Bad Attribute found in $type", $fd, $parms)
    unless $att_name{$att_id};
   if ($att_id eq $att{TnefVersion}) {
-   return rtn_err("Version attribute found in attachment", $fd, $parms)
+   return _rtn_err("Version attribute found in attachment", $fd, $parms)
     if $is_att;
-   return rtn_err("Version must be first attribute in message", $fd, $parms)
+   return _rtn_err("Version must be first attribute in message", $fd, $parms)
     if $att_cnt;
    $att_cnt++;
    $ent = $msg;
   } elsif ($att_id eq $att{AttachRenddata}) {
-   return rtn_err("AttachRenddata attribute found in attachment", $fd, $parms)
+   return _rtn_err("AttachRenddata attribute found in attachment", $fd, $parms)
     if $is_msg;
    push @atts, ($ent = Convert::TNEF::Data->new);
   } else {
-   return rtn_err("AttachRenddata must be first attribute", $fd, $parms)
+   return _rtn_err("AttachRenddata must be first attribute", $fd, $parms)
     if $is_att and ! @atts and $att_name ne "AttachRenddata" ;
   }
   print "Got attribute:$att_name{$att_id}\n" if $debug;
 
   $num_bytes = $fd->read($data, 4);
-  return read_err($num_bytes,$fd,$!) unless equal($num_bytes,4);
+  return _read_err($num_bytes,$fd,$!) unless _equal($num_bytes,4);
 
   print "HLength:", unpack("H8",$data), "\n" if $debug;
   my $length = unpack("V", $data);
@@ -275,41 +275,42 @@ sub read {
   # Get the attribute data (returns an object since data may
   # actually end up in a file)
   my $calc_chksum;
-  $data=$self->build_data($fd, $length, \$calc_chksum, $parms) or return undef;
-  $self->debug_print($length, $att_id, $data, $parms) if $debug;
+  $data=_build_data($fd, $length, \$calc_chksum, $parms) or return undef;
+  _debug_print($length, $att_id, $data, $parms) if $debug;
   $ent->datahandle($att_name, $data, $length);
 
   $num_bytes = $fd->read($data, 2);
-  return read_err($num_bytes,$fd,$!) unless equal($num_bytes,2);
+  return _read_err($num_bytes,$fd,$!) unless _equal($num_bytes,2);
   my $file_chksum = $data;
   if ($debug) {
    print "Calc Chksum:", unpack("H*",$calc_chksum),"\n";
    print "File Chksum:", unpack("H*",$file_chksum),"\n";
   }
-  return rtn_err("Bad Checksum", $fd, $parms)
+  return _rtn_err("Bad Checksum", $fd, $parms)
    unless $calc_chksum eq $file_chksum or $ignore_checksum;
 
   my $num_bytes=$fd->read($data, 1);
   # EOF (0 bytes) is ok
-  return read_err($num_bytes,$fd,$!) unless defined $num_bytes;
+  return _read_err($num_bytes,$fd,$!) unless defined $num_bytes;
+  last LOOP if $num_bytes < 1;
   print "Next token:", unpack("H2", $data), "\n" if $debug;
   $is_msg = ($data eq $LVL_MESSAGE);
-  return rtn_err("Found message data in attachment", $fd, $parms)
+  return _rtn_err("Found message data in attachment", $fd, $parms)
    if $is_msg and $is_att;
   $is_att = ($data eq $LVL_ATTACHMENT);
-  $is_eof = ($num_bytes < 1) or
-   return rtn_err("Not a TNEF $type", $fd, $parms) unless $is_msg or $is_att;
+  redo LOOP if $is_msg or $is_att;
+  return _rtn_err("Not a TNEF $type", $fd, $parms);
  }
 
- print "EOF\n" if $debug and $is_eof;
+ print "EOF\n" if $debug;
 
  $self->{TN_Message} = $msg;
  $self->{TN_Attachments} = \@atts;
  return $self;
 }
 
-sub debug_print {
- my ($self, $length, $att_id, $data, $parms) = @_;
+sub _debug_print {
+ my ($length, $att_id, $data, $parms) = @_;
  if ($length < $parms->{debug_max_display}) {
   $data = $data->data;
   if ($att_id eq $att{TnefVersion}) {
@@ -346,8 +347,8 @@ sub debug_print {
  }
 }
 
-sub build_data {
- my ($self, $fd, $length, $chksumref, $parms) = @_;
+sub _build_data {
+ my ($fd, $length, $chksumref, $parms) = @_;
  my $cutoff = $parms->{output_to_core};
  my $incore = do {
   if    ($cutoff eq 'NONE') { 0 } #Everything to files
@@ -358,7 +359,7 @@ sub build_data {
 
  # Just borrow some other objects for the attachment attribute data
  my $body = ($incore)? new MIME::Body::Scalar
-                     : new MIME::Body::File mk_fname($parms);
+                     : new MIME::Body::File _mk_fname($parms);
  $body->binmode(1);
  my $io = $body->open("w");
  my $bufsiz = $parms->{buffer_size};
@@ -367,7 +368,7 @@ sub build_data {
  my $chksum = 0;
  while ($length > 0) {
   my $num_bytes=$fd->read($buffer, $bufsiz);
-  return read_err($num_bytes,$fd,$!) unless equal($num_bytes,$bufsiz);
+  return _read_err($num_bytes,$fd,$!) unless _equal($num_bytes,$bufsiz);
   $io->print($buffer);
   $chksum += unpack("%16C*", $buffer);
   $chksum %= 65536;

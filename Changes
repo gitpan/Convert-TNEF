@@ -1,5 +1,11 @@
 Revision history for Perl extension Convert::TNEF.
 
+0.16  Tue Jul 31 2001
+        - Simplified main loop some more. Don't need to check for end
+          of processing twice.
+        - Prefixed 'private' functions with underscore character.
+        - changed a couple of 'methods' which didn't use '$self' and weren't
+          documented as methods into 'private' functions.
 0.15  Tue Jul 31 2001
         - Finally combined message and attachment parsing loops.
         - Removed the '|| []' from the attachment() method. I'm storing
