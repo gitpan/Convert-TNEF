@@ -30,7 +30,7 @@ use MIME::Body;
 # We're not exporting anything
 
 use AutoLoader qw(AUTOLOAD);
-$VERSION = '0.07';
+$VERSION = '0.08';
 
 # Set some TNEF constants. Everything turned
 # out to be in little endian order, so I just added
@@ -534,6 +534,8 @@ sub read {
   print "TNEF attachment attribute: ",unpack("H*", $data),"\n" if $debug;
   return rtn_err("Bad Attribute found in attachment", $fd, $parms)
    unless $att_name;
+  return rtn_err("AttachRenddata must be first attribute", $fd, $parms)
+   if $attch_cnt < 0 and $att_name ne "AttachRenddata" ;
   return rtn_err("Version record found in attachment", $fd, $parms)
    if $att_id eq $att{TnefVersion};
   print "Got attribute:$att_name\n" if $debug;
@@ -551,12 +553,8 @@ sub read {
   $data=$self->build_data($fd, $length, \$calc_chksum, $parms) or return undef;
   $self->debug_print($length, $att_id, $data, $parms) if $debug;
 
-  # See if we're starting a new attachment
-  if ($att_name eq "AttachRenddata" or $attch_cnt < 0) {
-   $attch_cnt++;
-   $atts[$attch_cnt] = {};
-   bless $atts[$attch_cnt], $class;
-  }
+  # See if we're starting a new attachment then save the data
+  $atts[++$attch_cnt] = bless {}, $class if $att_name eq "AttachRenddata";
   $atts[$attch_cnt]{$att_name} = $data;
   $atts[$attch_cnt]{TN_Size}{$att_name} = $length;
 
