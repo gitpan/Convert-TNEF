@@ -1,5 +1,15 @@
 Revision history for Perl extension Convert::TNEF.
 
+0.03  Tue May  8 15:00:00 2000
+        - There was two purge methods. I purged one of them (the bad one).
+        - fixed a die() in the parse method to return a failure status instead.
+        - Took out the subclasses which were just aliases for
+          for MIME::Body::*, and weren't really proper subclasses anyway.
+          I forget why I did it that way, maybe I planned on making some
+          extra methods later, or just to see if it worked.
+          There really should be separate classes for a TNEF object,
+          and for the attachments in the TNEF object, maybe someday I'll
+          get around to it.
 0.02  Mon Dec 12 17:30:00 1999
         - fixed and cleaned up some of the debug output.
         - had the bright idea in the first release of including a

@@ -4,20 +4,6 @@
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl itself.
 
-# All attribute data will be just like a MIME::Body
-# since its a class for storing stuff in either
-# a file or a scalar.
-require MIME::Body;
-
-package Convert::TNEF::Scalar;
-use vars qw(@ISA);
-@ISA=qw(MIME::Body::Scalar);
-
-package Convert::TNEF::File;
-use vars qw(@ISA);
-@ISA=qw(MIME::Body::File);
-
-# Here's the main package (but NOT 'package main' ;^)
 package Convert::TNEF;
 
 use strict;
@@ -38,14 +24,12 @@ use vars qw(
 use Carp;
 use IO::Wrap;
 use File::Spec;
+use MIME::Body;
 
-require AutoLoader;
+# We're not exporting anything
 
-@ISA = qw(Exporter AutoLoader);
-
-$VERSION = '0.02';
-
-# Preloaded methods go here.
+use AutoLoader qw(AUTOLOAD);
+$VERSION = '0.03';
 
 # Set some TNEF constants. Everything turned
 # out to be in little endian order, so I just added
@@ -57,16 +41,18 @@ $TNEF_PURE      = reverse pack('H*','00010000');
 $LVL_MESSAGE    = pack('H*','01');
 $LVL_ATTACHMENT = pack('H*','02');
 
-$atp{Triples}     = pack('H*','0000');
-$atp{String}      = pack('H*','0001');
-$atp{Text}        = pack('H*','0002');
-$atp{Date}        = pack('H*','0003');
-$atp{Short}       = pack('H*','0004');
-$atp{Long}        = pack('H*','0005');
-$atp{Byte}        = pack('H*','0006');
-$atp{Word}        = pack('H*','0007');
-$atp{Dword}       = pack('H*','0008');
-$atp{Max}         = pack('H*','0009');
+%atp = (
+ Triples     => pack('H*','0000'),
+ String      => pack('H*','0001'),
+ Text        => pack('H*','0002'),
+ Date        => pack('H*','0003'),
+ Short       => pack('H*','0004'),
+ Long        => pack('H*','0005'),
+ Byte        => pack('H*','0006'),
+ Word        => pack('H*','0007'),
+ Dword       => pack('H*','0008'),
+ Max         => pack('H*','0009'),
+);
 
 for (keys %atp) {
  $atp{$_} = reverse $atp{$_};
@@ -78,46 +64,47 @@ sub ATT {
 }
 
 # The side comments are 'MAPI' equivalents
-$att{Null}           = ATT( pack('H*','0000'), pack('H4','0000'));
-$att{From}=ATT($atp{Triples}, pack('H*','8000')); # PR_ORIGINATOR_RETURN_ADDRESS
-$att{Subject}        = ATT( $atp{String}, pack('H*','8004')); # PR_SUBJECT
-$att{DateSent}    = ATT( $atp{Date}, pack('H*','8005')); # PR_CLIENT_SUBMIT_TIME
-$att{DateRecd} = ATT( $atp{Date}, pack('H*','8006')); # PR_MESSAGE_DELIVERY_TIME
-$att{MessageStatus}  = ATT( $atp{Byte}, pack('H*','8007')); # PR_MESSAGE_FLAGS
-$att{MessageClass}   = ATT( $atp{Word}, pack('H*','8008')); # PR_MESSAGE_CLASS
-$att{MessageID}      = ATT( $atp{String}, pack('H*','8009')); # PR_MESSAGE_ID
-$att{ParentID}       = ATT( $atp{String}, pack('H*','800A')); # PR_PARENT_ID
-$att{ConversationID}=ATT( $atp{String}, pack('H*','800B')); # PR_CONVERSATION_ID
-$att{Body}           = ATT( $atp{Text}, pack('H*','800C')); # PR_BODY
-$att{Priority}       = ATT( $atp{Short}, pack('H*','800D')); # PR_IMPORTANCE
-$att{AttachData}     = ATT( $atp{Byte}, pack('H*','800F')); # PR_ATTACH_DATA_xxx
-$att{AttachTitle}  = ATT( $atp{String}, pack('H*','8010')); # PR_ATTACH_FILENAME
-$att{AttachMetaFile}= ATT( $atp{Byte}, pack('H*','8011')); # PR_ATTACH_RENDERING
-$att{AttachCreateDate} = ATT( $atp{Date}, pack('H*','8012')); # PR_CREATION_TIME
-$att{AttachModifyDate} = ATT( $atp{Date}, pack('H*','8013')); # PR_LAST_MODIFICATION_TIME
-$att{DateModified}=ATT($atp{Date},pack('H*','8020'));# PR_LAST_MODIFICATION_TIME
-$att{AttachTransportFilename} = ATT($atp{Byte}, pack('H*','9001')); #PR_ATTACH_TRANSPORT_NAME
-$att{AttachRenddata}   = ATT( $atp{Byte}, pack('H*','9002'));
-$att{MAPIProps}   = ATT( $atp{Byte}, pack('H*','9003'));
-$att{RecipTable}  = ATT( $atp{Byte}, pack('H*','9004')); # PR_MESSAGE_RECIPIENTS
-$att{Attachment}  = ATT( $atp{Byte}, pack('H*','9005'));
-$att{TnefVersion} = ATT( $atp{Dword}, pack('H*','9006'));
-$att{OemCodepage} = ATT( $atp{Byte}, pack('H*','9007'));
-$att{OriginalMessageClass} = ATT( $atp{Word}, pack('H*','0006')); # PR_ORIG_MESSAGE_CLASS
+%att = (
+ Null     => ATT( pack('H*','0000'), pack('H4','0000')),
+ From     => ATT($atp{Triples},pack('H*','8000')),# PR_ORIGINATOR_RETURN_ADDRESS
+ Subject  => ATT( $atp{String}, pack('H*','8004')), # PR_SUBJECT
+ DateSent => ATT( $atp{Date}, pack('H*','8005')), # PR_CLIENT_SUBMIT_TIME
+ DateRecd => ATT( $atp{Date}, pack('H*','8006')), # PR_MESSAGE_DELIVERY_TIME
+ MessageStatus  => ATT( $atp{Byte}, pack('H*','8007')), # PR_MESSAGE_FLAGS
+ MessageClass   => ATT( $atp{Word}, pack('H*','8008')), # PR_MESSAGE_CLASS
+ MessageID      => ATT( $atp{String}, pack('H*','8009')), # PR_MESSAGE_ID
+ ParentID       => ATT( $atp{String}, pack('H*','800A')), # PR_PARENT_ID
+ ConversationID =>ATT( $atp{String}, pack('H*','800B')), # PR_CONVERSATION_ID
+ Body           => ATT( $atp{Text}, pack('H*','800C')), # PR_BODY
+ Priority       => ATT( $atp{Short}, pack('H*','800D')), # PR_IMPORTANCE
+ AttachData     => ATT( $atp{Byte}, pack('H*','800F')), # PR_ATTACH_DATA_xxx
+ AttachTitle    => ATT( $atp{String}, pack('H*','8010')), # PR_ATTACH_FILENAME
+ AttachMetaFile => ATT( $atp{Byte}, pack('H*','8011')), # PR_ATTACH_RENDERING
+ AttachCreateDate => ATT( $atp{Date}, pack('H*','8012')), # PR_CREATION_TIME
+ AttachModifyDate => ATT( $atp{Date}, pack('H*','8013')), # PR_LAST_MODIFICATION_TIME
+ DateModified => ATT($atp{Date},pack('H*','8020')),# PR_LAST_MODIFICATION_TIME
+ AttachTransportFilename => ATT($atp{Byte}, pack('H*','9001')), #PR_ATTACH_TRANSPORT_NAME
+ AttachRenddata => ATT( $atp{Byte}, pack('H*','9002')),
+ MAPIProps   => ATT( $atp{Byte}, pack('H*','9003')),
+ RecipTable  => ATT( $atp{Byte}, pack('H*','9004')), # PR_MESSAGE_RECIPIENTS
+ Attachment  => ATT( $atp{Byte}, pack('H*','9005')),
+ TnefVersion => ATT( $atp{Dword}, pack('H*','9006')),
+ OemCodepage => ATT( $atp{Byte}, pack('H*','9007')),
+ OriginalMessageClass => ATT( $atp{Word}, pack('H*','0006')), # PR_ORIG_MESSAGE_CLASS
 
-$att{Owner} = ATT( $atp{Byte}, pack('H*','0000')); # PR_RCVD_REPRESENTING_xxx or PR_SENT_REPRESENTING_xxx
-$att{SentFor} = ATT( $atp{Byte}, pack('H*','0001')); # PR_SENT_REPRESENTING_xxx
-$att{Delegate} = ATT( $atp{Byte}, pack('H*','0002')); # PR_RCVD_REPRESENTING_xxx
-$att{DateStart} = ATT( $atp{Date}, pack('H*','0006')); # PR_DATE_START
-$att{DateEnd} = ATT( $atp{Date}, pack('H*','0007')); # PR_DATE_END
-$att{AidOwner} = ATT( $atp{Long}, pack('H*','0008')); # PR_OWNER_APPT_ID
-$att{RequestRes} = ATT( $atp{Short}, pack('H*','0009')); # PR_RESPONSE_REQUESTED
+ Owner => ATT( $atp{Byte}, pack('H*','0000')), # PR_RCVD_REPRESENTING_xxx or PR_SENT_REPRESENTING_xxx
+ SentFor => ATT( $atp{Byte}, pack('H*','0001')), # PR_SENT_REPRESENTING_xxx
+ Delegate => ATT( $atp{Byte}, pack('H*','0002')), # PR_RCVD_REPRESENTING_xxx
+ DateStart => ATT( $atp{Date}, pack('H*','0006')), # PR_DATE_START
+ DateEnd => ATT( $atp{Date}, pack('H*','0007')), # PR_DATE_END
+ AidOwner => ATT( $atp{Long}, pack('H*','0008')), # PR_OWNER_APPT_ID
+ RequestRes => ATT( $atp{Short}, pack('H*','0009')), # PR_RESPONSE_REQUESTED
+);
 
 # Create reverse lookup table
-while ( my ($att_name, $att_id) = each %att) {
- $att_name{$att_id}=$att_name;
-}
+%att_name = reverse %att;
 
+# Global counter for creating file names
 $g_file_cnt=0;
 
 # Set some package global defaults for new objects
@@ -134,6 +121,7 @@ $g_file_cnt=0;
  buffer_size=>1024,
 );
 
+# Make a file name
 sub mk_fname {
  my $parms = shift;
  File::Spec->catfile($parms->{output_dir},
@@ -164,6 +152,7 @@ sub read_err {
  return undef;
 }
 
+# I don't want any complaints about comparing undef
 sub equal {
  local $^W=0;
  $_[0] == $_[1];
@@ -206,7 +195,7 @@ __END__
 
 =head1 DESCRIPTION
 
- TNEF stands for Transport Network Encapsulation Format, and if you've
+ TNEF stands for Transport Neutral Encapsulation Format, and if you've
  ever been unfortunate enough to receive one of these files as an email
  attachment, you may want to use this module.
 
@@ -308,53 +297,6 @@ __END__
  use MIME::Parser;
  use Convert::TNEF;
 
- # Redefine some functions
- # Hopefully these will be incorporated into the
- # regular distribution for these modules
- {
-  local $^W=0;
-
-  eval <<'EOT';
-  use Carp;
-
-  sub Net::POP3::get {
-   @_ == 3 or croak 'usage: $pop3->get( MSGNUM, FH )';
-   my ($me, $msg, $fh) = @_;
-
-   return undef
-     unless $me->_RETR($msg);
-
-   $me->read_until_dot($fh);
-  }
-
-  sub Net::Cmd::read_until_dot {
-   my $cmd = shift;
-   my $fh  = shift;
-   my $arr = [];
-
-   while(1)
-   {
-    my $str = $cmd->getline() or return undef;
-
-    $cmd->debug_print(0,$str)
-      if ($cmd->debug & 4);
-
-    last if($str =~ /^\.\r?\n/o);
-
-    $str =~ s/^\.\././o;
-
-    if ($fh) {
-     print $fh $str;
-    } else {
-     push (@$arr, $str);
-    }
-   }
-
-   $arr;
-  }
- EOT
- }
-
  my $mail_dir = "mailout";
  my $mail_prefix = "mail";
 
@@ -376,6 +318,7 @@ __END__
   my $fname = $mail_prefix."-".$$.++$mail_out_idx.".doc";
   open (MAILOUT, ">$mail_dir/$fname")
    or die "Can't open $mail_dir/$fname: $!";
+  # If the get() complains, you need the new libnet bundle
   $pop->get($i, \*MAILOUT) or die "Can't read mail";
   close MAILOUT or die "Error closing $mail_dir/$fname";
   # If you want to delete the mail on the server
@@ -412,7 +355,7 @@ __END__
 
    # Create a tnef object
    my $tnef = Convert::TNEF->read_ent($ent,{output_dir=>"tnefmail"})
-   or die $Convert::TNEF::errstr;
+    or die $Convert::TNEF::errstr;
    for ($tnef->attachments) {
     print "Title:",$_->name,"\n";
     print "Data:\n",$_->data,"\n";
@@ -626,9 +569,12 @@ sub read {
   $num_bytes = $fd->read($data, 2);
   return read_err($num_bytes,$fd,$!) unless equal($num_bytes,2);
   my $file_chksum = $data;
-  print "Calc Chksum:", unpack("H*",$calc_chksum),"\n" if $debug;
-  print "File Chksum:", unpack("H*",$file_chksum),"\n" if $debug;
-  die "Bad Checksum\n" unless $calc_chksum eq $file_chksum or $ignore_checksum;
+  if ($debug) {
+   print "Calc Chksum:", unpack("H*",$calc_chksum),"\n";
+   print "File Chksum:", unpack("H*",$file_chksum),"\n";
+  }
+  return rtn_err("Bad Checksum", $fd, $parms)
+   unless $calc_chksum eq $file_chksum or $ignore_checksum;
 
   my $num_bytes=$fd->read($data, 1);
   # EOF (0 bytes) is ok
@@ -707,8 +653,9 @@ sub build_data {
   else { 1 }                      #Everything else in memory
  };
 
- my $body = ($incore)? new Convert::TNEF::Scalar
-                     : new Convert::TNEF::File mk_fname($parms);
+ # Just borrow some other objects for the attachment attribute data
+ my $body = ($incore)? new MIME::Body::Scalar
+                     : new MIME::Body::File mk_fname($parms);
  $body->binmode(1);
  my $io = $body->open("w");
  my $bufsiz = $parms->{buffer_size};
@@ -727,13 +674,6 @@ sub build_data {
  $$chksumref = pack("v", $chksum);
  $io->close;
  return $body;
-}
-
-sub purge {
- my $self = shift;
- for ($self->attachments) {
-  $_->purge;
- }
 }
 
 sub purge {
@@ -760,6 +700,9 @@ sub attachments {
  return @{$attachments};
 }
 
+# The methods from here down should really
+# be a separate class since they operate
+# on the attachment, not on the TNEF object.
 sub data {
  my $self = shift;
  my $attr = shift || 'AttachData';
@@ -772,6 +715,8 @@ sub name {
  return $self->{$attr}->data;
 }
 
+# There must be a better way to parse this
+# If you know what it is, please tell me
 sub longname {
  my $self = shift;
  my $name = $self->name;
@@ -781,7 +726,6 @@ sub longname {
  my $data = $self->data("Attachment");
  my ($longname) = $data =~ /\x00(\Q$prfx\E[^\x00]+\Q$ext\E)\x00/i;
  return $longname || $name;
-
 }
 
 sub datahandle {
