@@ -29,7 +29,7 @@ use MIME::Body;
 # We're not exporting anything
 
 use AutoLoader qw(AUTOLOAD);
-$VERSION = '0.03';
+$VERSION = '0.04';
 
 # Set some TNEF constants. Everything turned
 # out to be in little endian order, so I just added
@@ -720,7 +720,8 @@ sub name {
 sub longname {
  my $self = shift;
  my $name = $self->name;
- my ($prfx, $ext) = $name =~ /(.{6})~\d(\..{0,3})/;
+ my ($prfx, $ext) =
+  $name =~ /^([^.\x00]{6,8}?)(?:~\d)?((?:\.[^\x00]{0,3})?)\x00*$/;
  return $name unless defined $prfx;
 
  my $data = $self->data("Attachment");
