@@ -1,5 +1,23 @@
 Revision history for Perl extension Convert::TNEF.
 
+0.05  Tue May 16 16:30:00 2000
+        - Both name() and longname() now strip trailing null characters. This
+          doesn't seem to make a difference when creating a file, but it does
+          in string comparison.
+        - longname() works much better now. It no longer depends
+          on finding the 'AttachTitle' attribute (shortname) first
+          (which was a sorry hack of a way to do it).
+          I've looked at several different TNEF example docs, from my
+          own creation and from Mark Simpson's 'tnef' utility, so I'm
+          fairly certain about it now. The actual file name appears
+          twice in the field, but one of them is not always the full
+          name (if there's a space in the name?). So we get the other
+          instance of the name.
+          If someone could look through the MS Platform SDK and see if
+          the 'official' way to parse this field is in there, it'd be
+          much appreciated.
+        - Fixed the 'make test', which really wasn't testing what it was
+          supposed to, and added another test while I was at it.
 0.04  Thu May 11 16:00:00 2000
         - The longname method should work better now. I still wish I could
           be 100% sure about the way I'm doing it. I'm sure its not the

@@ -29,7 +29,7 @@ use MIME::Body;
 # We're not exporting anything
 
 use AutoLoader qw(AUTOLOAD);
-$VERSION = '0.04';
+$VERSION = '0.05';
 
 # Set some TNEF constants. Everything turned
 # out to be in little endian order, so I just added
@@ -712,21 +712,23 @@ sub data {
 sub name {
  my $self = shift;
  my $attr = shift || 'AttachTitle';
- return $self->{$attr}->data;
+ my $name = $self->{$attr}->data;
+ $name =~ s/\x00+$// if $name;
+ return $name;
 }
 
-# There must be a better way to parse this
-# If you know what it is, please tell me
+# Try to get the long filename out of the
+# 'Attachment' attribute.
 sub longname {
  my $self = shift;
- my $name = $self->name;
- my ($prfx, $ext) =
-  $name =~ /^([^.\x00]{6,8}?)(?:~\d)?((?:\.[^\x00]{0,3})?)\x00*$/;
- return $name unless defined $prfx;
 
  my $data = $self->data("Attachment");
- my ($longname) = $data =~ /\x00(\Q$prfx\E[^\x00]+\Q$ext\E)\x00/i;
- return $longname || $name;
+ my $pos = index($data, pack("H*", "1e00013001"));
+ return $self->name unless $pos >= 0;
+ my $len = unpack("V", substr($data, $pos+8, 4));
+ my $longname = substr($data, $pos+12, $len);
+ $longname =~ s/\x00+$// if $longname;
+ return $longname || $self->name;
 }
 
 sub datahandle {
