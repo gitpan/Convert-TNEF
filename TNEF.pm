@@ -7,6 +7,7 @@
 package Convert::TNEF;
 
 use strict;
+use integer;
 use vars qw(
  @ISA @EXPORT @EXPORT_OK $VERSION
  $TNEF_SIGNATURE
@@ -29,7 +30,7 @@ use MIME::Body;
 # We're not exporting anything
 
 use AutoLoader qw(AUTOLOAD);
-$VERSION = '0.06';
+$VERSION = '0.07';
 
 # Set some TNEF constants. Everything turned
 # out to be in little endian order, so I just added
@@ -74,7 +75,7 @@ sub ATT {
  MessageClass   => ATT( $atp{Word}, pack('H*','8008')), # PR_MESSAGE_CLASS
  MessageID      => ATT( $atp{String}, pack('H*','8009')), # PR_MESSAGE_ID
  ParentID       => ATT( $atp{String}, pack('H*','800A')), # PR_PARENT_ID
- ConversationID =>ATT( $atp{String}, pack('H*','800B')), # PR_CONVERSATION_ID
+ ConversationID => ATT( $atp{String}, pack('H*','800B')), # PR_CONVERSATION_ID
  Body           => ATT( $atp{Text}, pack('H*','800C')), # PR_BODY
  Priority       => ATT( $atp{Short}, pack('H*','800D')), # PR_IMPORTANCE
  AttachData     => ATT( $atp{Byte}, pack('H*','800F')), # PR_ATTACH_DATA_xxx
@@ -519,6 +520,7 @@ sub read {
  return rtn_err("Not an attachment", $fd, $parms) unless $is_eof or $is_att;
 
  my @atts=();
+ my $attch_cnt = -1;
  my %attachment=();
  my %attachment_size=();
  while ($is_att) {
@@ -527,13 +529,14 @@ sub read {
   $num_bytes = $fd->read($data, 4);
   return read_err($num_bytes,$fd,$!) unless equal($num_bytes,4);
   my $att_id = $data;
+  my $att_name = $att_name{$att_id};
 
   print "TNEF attachment attribute: ",unpack("H*", $data),"\n" if $debug;
   return rtn_err("Bad Attribute found in attachment", $fd, $parms)
-   unless $att_name{$att_id};
+   unless $att_name;
   return rtn_err("Version record found in attachment", $fd, $parms)
    if $att_id eq $att{TnefVersion};
-  print "Got attribute:$att_name{$att_id}\n" if $debug;
+  print "Got attribute:$att_name\n" if $debug;
 
   $num_bytes = $fd->read($data, 4);
   return read_err($num_bytes,$fd,$!) unless equal($num_bytes,4);
@@ -549,20 +552,13 @@ sub read {
   $self->debug_print($length, $att_id, $data, $parms) if $debug;
 
   # See if we're starting a new attachment
-  if ($att_id eq $att{AttachRenddata}) {
-   # Save the previous attachment, if any
-   if (%attachment) {
-    $attachment{TN_Size} = {%attachment_size};
-    my $attref = {%attachment};
-    bless $attref, $class;
-    push(@atts, $attref);
-   }
-   %attachment = (AttachRendData=>$data);
-   %attachment_size = (AttachRendData=>$length);
-  } else {
-   $attachment{$att_name{$att_id}} = $data;
-   $attachment_size{$att_name{$att_id}} = $length;
+  if ($att_name eq "AttachRenddata" or $attch_cnt < 0) {
+   $attch_cnt++;
+   $atts[$attch_cnt] = {};
+   bless $atts[$attch_cnt], $class;
   }
+  $atts[$attch_cnt]{$att_name} = $data;
+  $atts[$attch_cnt]{TN_Size}{$att_name} = $length;
 
   # Validate checksum
   $num_bytes = $fd->read($data, 2);
@@ -582,12 +578,6 @@ sub read {
   $is_msg = ($data eq $LVL_MESSAGE);
   $is_att = ($data eq $LVL_ATTACHMENT);
   $is_eof = ($num_bytes < 1);
- }
- if (%attachment) {
-  my $attref = \%attachment;
-  $attref->{TN_Size} = \%attachment_size;
-  bless $attref, $class;
-  push(@atts, $attref);
  }
 
  return rtn_err("Message found in attachment section",$fd,$parms)
