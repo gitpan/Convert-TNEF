@@ -30,7 +30,7 @@ use MIME::Body;
 # We're not exporting anything
 
 use AutoLoader qw(AUTOLOAD);
-$VERSION = '0.10';
+$VERSION = '0.11';
 
 # Set some TNEF constants. Everything turned
 # out to be in little endian order, so I just added
@@ -158,231 +158,6 @@ sub equal {
  local $^W=0;
  $_[0] == $_[1];
 }
-
-# Autoload methods go after =cut, and are processed by the autosplit program.
-
-1;
-__END__
-
-=head1 NAME
-
- Convert::TNEF - Perl module to read TNEF files
-
-=head1 SYNOPSIS
-
- use Convert::TNEF;
-
- $tnef = Convert::TNEF->read($iohandle, \%parms)
-  or die Convert::TNEF::errstr;
-
- $tnef = Convert::TNEF->read_in($filename, \%parms)
-  or die Convert::TNEF::errstr;
-
- $tnef = Convert::TNEF->read_ent($mime_entity, \%parms)
-  or die Convert::TNEF::errstr;
-
- $tnef->purge;
-
- $message = $tnef->message;
-
- @attachments = $tnef->attachments;
-
- $attribute_value      = $attachments[$i]->data($att_attribute_name);
- $attribute_value_size = $attachments[$i]->size($att_attribute_name);
- $attachment_name = $attachments[$i]->name;
- $long_attachment_name = $attachments[$i]->longname;
-
- $datahandle = $attachments[$i]->datahandle($att_attribute_name);
-
-=head1 DESCRIPTION
-
- TNEF stands for Transport Neutral Encapsulation Format, and if you've
- ever been unfortunate enough to receive one of these files as an email
- attachment, you may want to use this module.
-
- read() takes as its first argument any file handle open
- for reading. The optional second argument is a hash reference
- which contains one or more of the following keys:
-
-=head2
-
- output_dir - Path for storing TNEF attribute data kept in files
- (default: current directory).
-
- output_prefix - File prefix for TNEF attribute data kept in files
- (default: 'tnef').
-
- output_to_core - TNEF attribute data will be saved in core memory unless
- it is greater than this many bytes (default: 4096). May also be set to
- 'NONE' to keep all data in files, or 'ALL' to keep all data in core.
-
- buffer_size - Buffer size for reading in the TNEF file (default: 1024).
-
- debug - If true, outputs all sorts of info about what the read() function
- is reading, including the raw ascii data along with the data converted
- to hex (default: false).
-
- display_after_err - If debug is true and an error is encountered,
- reads and displays this many bytes of data following the error
- (default: 32).
-
- debug_max_display - If debug is true then read and display at most
- this many bytes of data for each TNEF attribute (default: 1024).
-
- debug_max_line_size - If debug is true then at most this many bytes of
- data will be displayed on each line for each TNEF attribute
- (default: 64).
-
- ignore_checksum - If true, will ignore checksum errors while parsing
- data (default: false).
-
- read() returns an object containing the TNEF 'attributes' read from the
- file and the data for those attributes. If all you want are the
- attachments, then this is mostly garbage, but if you're interested then
- you can see all the garbage by turning on debugging. If the garbage
- proves useful to you, then let me know how I can maybe make it more
- useful.
-
- If an error is encountered, an undefined value is returned and the
- package variable $errstr is set to some helpful message.
-
- read_in() is a convienient front end for read() which takes a filename
- instead of a handle.
-
- read_ent() is another convient front end for read() which can take a
- MIME::Entity object (or any object with like methods, specifically
- open("r"), read($buff,$num_bytes), and close ).
-
- purge() deletes any on-disk data that may be in the attachments of
- the TNEF object.
-
- message() returns the message portion of the tnef object, if any.
- The thing it returns is like an attachment, but its not an attachment.
- For instance, it more than likely does not have a name or any
- attachment data.
-
- attachments() returns a list of the attachments that the given TNEF
- object contains.
-
- data() takes a TNEF attribute name, and returns a string value for that 
- attribute for that attachment. Its your own problem if the string is too
- big for memory. If no argument is given, then the 'AttachData' attribute
- is assumed, which is probably the data you're looking for.
-
- name() is the same as data(), except the attribute 'AttachTitle' is
- assumed, which returns the 8 character + 3 character extension name of
- the attachment.
-
- longname() returns the long filename and extension of an attachment. This
- is embedded in the 'Attachment' attribute data, so we attempt to extract
- the name out of that.
-
- size() takes an TNEF attribute name, and returns the size in bytes for
- the data for that attachment attribute.
-
- datahandle() is a method for attachments which takes a TNEF attribute
- name, and returns the data for that attribute as an object which is
- the same as a MIME::Body object.  See MIME::Body for all the applicable
- methods. If no argument is given, then 'AttachData' is assumed.
-
-
-=head1 EXAMPLES
-
- # Here's a rather long example where mail is retrieved
- # from a POP3 server based on header information, then
- # it is MIME parsed, and then the TNEF contents
- # are extracted and converted.
-
- use strict;
- use Net::POP3;
- use MIME::Parser;
- use Convert::TNEF;
-
- my $mail_dir = "mailout";
- my $mail_prefix = "mail";
-
- my $pop = new Net::POP3 ( "pop3server_name" );
- my $num_msgs = $pop->login("user_name","password");
- die "Can't login: $!" unless defined $num_msgs;
-
- # Get mail by sender and subject
- my $mail_out_idx = 0;
- MESSAGE: for ( my $i=1; $i<= $num_msgs;  $i++ ) {
-  my $header = join "", @{$pop->top($i)};
-
-  for ($header) {
-   next MESSAGE unless
-    /^from:.*someone\@somewhere.net/im &&
-    /^subject:\s*important stuff/im
-  }
-
-  my $fname = $mail_prefix."-".$$.++$mail_out_idx.".doc";
-  open (MAILOUT, ">$mail_dir/$fname")
-   or die "Can't open $mail_dir/$fname: $!";
-  # If the get() complains, you need the new libnet bundle
-  $pop->get($i, \*MAILOUT) or die "Can't read mail";
-  close MAILOUT or die "Error closing $mail_dir/$fname";
-  # If you want to delete the mail on the server
-  # $pop->delete($i);
- }
-
- close MAILOUT;
- $pop->quit();
-
- # Parse the mail message into separate mime entities
- my $parser=new MIME::Parser;
- $parser->output_dir("mimemail");
-
- opendir(DIR, $mail_dir) or die "Can't open directory $mail_dir: $!";
- my @files = map { $mail_dir."/".$_ } sort
-  grep { -f "$mail_dir/$_" and /$mail_prefix-$$-/o } readdir DIR;
- closedir DIR;
-
- for my $file ( @files ) {
-  my $entity=$parser->parse_in($file) or die "Couldn't parse mail";
-  print_tnef_parts($entity);
-  # If you want to delete the working files
-  # $entity->purge;
- }
-
- sub print_tnef_parts {
-  my $ent = shift;
-
-  if ( $ent->parts ) {
-   for my $sub_ent ( $ent->parts ) {
-    print_tnef_parts($sub_ent);
-   }
-  } elsif ( $ent->mime_type =~ /ms-tnef/i ) {
-
-   # Create a tnef object
-   my $tnef = Convert::TNEF->read_ent($ent,{output_dir=>"tnefmail"})
-    or die $Convert::TNEF::errstr;
-   for ($tnef->attachments) {
-    print "Title:",$_->name,"\n";
-    print "Data:\n",$_->data,"\n";
-   }
-
-   # If you want to delete the working files
-   # $tnef->purge;
-  }
- }
-
-=head1 SEE ALSO
-
-perl(1), IO::Wrap(3), MIME::Parser(3), MIME::Entity(3), MIME::Body(3)
-
-=head1 CAVEATS
-
- The parsing may depend on the endianness (see perlport) and width of
- integers on the system where the TNEF file was created. If this proves
- to be the case (check the debug output), I'll see what I can do
- about it.
-
-=head1 AUTHOR
-
- Douglas Wilson, dwilson@gtemail.net
-
-=cut
 
 sub read_ent {
  croak "Usage: Convert::TNEF->read_ent(entity, parameters) "
@@ -634,9 +409,9 @@ sub build_data {
  my $cutoff = $parms->{output_to_core};
  my $incore = do {
   if    ($cutoff eq 'NONE') { 0 } #Everything to files
-  elsif ($cutoff eq 'ALL') { 1 }  #Everything in memory
+  elsif ($cutoff eq 'ALL')  { 1 } #Everything in memory
   elsif ($cutoff < $length) { 0 } #Large items in files
-  else { 1 }                      #Everything else in memory
+  else                      { 1 } #Everything else in memory
  };
 
  # Just borrow some other objects for the attachment attribute data
@@ -730,3 +505,227 @@ sub size {
  my $attr = shift || 'AttachData';
  return $self->{TN_Size}->{$attr};
 }
+# Autoload methods go after =cut, and are processed by the autosplit program.
+
+1;
+__END__
+
+=head1 NAME
+
+ Convert::TNEF - Perl module to read TNEF files
+
+=head1 SYNOPSIS
+
+ use Convert::TNEF;
+
+ $tnef = Convert::TNEF->read($iohandle, \%parms)
+  or die Convert::TNEF::errstr;
+
+ $tnef = Convert::TNEF->read_in($filename, \%parms)
+  or die Convert::TNEF::errstr;
+
+ $tnef = Convert::TNEF->read_ent($mime_entity, \%parms)
+  or die Convert::TNEF::errstr;
+
+ $tnef->purge;
+
+ $message = $tnef->message;
+
+ @attachments = $tnef->attachments;
+
+ $attribute_value      = $attachments[$i]->data($att_attribute_name);
+ $attribute_value_size = $attachments[$i]->size($att_attribute_name);
+ $attachment_name = $attachments[$i]->name;
+ $long_attachment_name = $attachments[$i]->longname;
+
+ $datahandle = $attachments[$i]->datahandle($att_attribute_name);
+
+=head1 DESCRIPTION
+
+ TNEF stands for Transport Neutral Encapsulation Format, and if you've
+ ever been unfortunate enough to receive one of these files as an email
+ attachment, you may want to use this module.
+
+ read() takes as its first argument any file handle open
+ for reading. The optional second argument is a hash reference
+ which contains one or more of the following keys:
+
+=head2
+
+ output_dir - Path for storing TNEF attribute data kept in files
+ (default: current directory).
+
+ output_prefix - File prefix for TNEF attribute data kept in files
+ (default: 'tnef').
+
+ output_to_core - TNEF attribute data will be saved in core memory unless
+ it is greater than this many bytes (default: 4096). May also be set to
+ 'NONE' to keep all data in files, or 'ALL' to keep all data in core.
+
+ buffer_size - Buffer size for reading in the TNEF file (default: 1024).
+
+ debug - If true, outputs all sorts of info about what the read() function
+ is reading, including the raw ascii data along with the data converted
+ to hex (default: false).
+
+ display_after_err - If debug is true and an error is encountered,
+ reads and displays this many bytes of data following the error
+ (default: 32).
+
+ debug_max_display - If debug is true then read and display at most
+ this many bytes of data for each TNEF attribute (default: 1024).
+
+ debug_max_line_size - If debug is true then at most this many bytes of
+ data will be displayed on each line for each TNEF attribute
+ (default: 64).
+
+ ignore_checksum - If true, will ignore checksum errors while parsing
+ data (default: false).
+
+ read() returns an object containing the TNEF 'attributes' read from the
+ file and the data for those attributes. If all you want are the
+ attachments, then this is mostly garbage, but if you're interested then
+ you can see all the garbage by turning on debugging. If the garbage
+ proves useful to you, then let me know how I can maybe make it more
+ useful.
+
+ If an error is encountered, an undefined value is returned and the
+ package variable $errstr is set to some helpful message.
+
+ read_in() is a convienient front end for read() which takes a filename
+ instead of a handle.
+
+ read_ent() is another convient front end for read() which can take a
+ MIME::Entity object (or any object with like methods, specifically
+ open("r"), read($buff,$num_bytes), and close ).
+
+ purge() deletes any on-disk data that may be in the attachments of
+ the TNEF object.
+
+ message() returns the message portion of the tnef object, if any.
+ The thing it returns is like an attachment, but its not an attachment.
+ For instance, it more than likely does not have a name or any
+ attachment data.
+
+ attachments() returns a list of the attachments that the given TNEF
+ object contains.
+
+ data() takes a TNEF attribute name, and returns a string value for that 
+ attribute for that attachment. Its your own problem if the string is too
+ big for memory. If no argument is given, then the 'AttachData' attribute
+ is assumed, which is probably the data you're looking for.
+
+ name() is the same as data(), except the attribute 'AttachTitle' is
+ assumed, which returns the 8 character + 3 character extension name of
+ the attachment.
+
+ longname() returns the long filename and extension of an attachment. This
+ is embedded in the 'Attachment' attribute data, so we attempt to extract
+ the name out of that.
+
+ size() takes an TNEF attribute name, and returns the size in bytes for
+ the data for that attachment attribute.
+
+ datahandle() is a method for attachments which takes a TNEF attribute
+ name, and returns the data for that attribute as an object which is
+ the same as a MIME::Body object.  See MIME::Body for all the applicable
+ methods. If no argument is given, then 'AttachData' is assumed.
+
+
+=head1 EXAMPLES
+
+ # Here's a rather long example where mail is retrieved
+ # from a POP3 server based on header information, then
+ # it is MIME parsed, and then the TNEF contents
+ # are extracted and converted.
+
+ use strict;
+ use Net::POP3;
+ use MIME::Parser;
+ use Convert::TNEF;
+
+ my $mail_dir = "mailout";
+ my $mail_prefix = "mail";
+
+ my $pop = new Net::POP3 ( "pop3server_name" );
+ my $num_msgs = $pop->login("user_name","password");
+ die "Can't login: $!" unless defined $num_msgs;
+
+ # Get mail by sender and subject
+ my $mail_out_idx = 0;
+ MESSAGE: for ( my $i=1; $i<= $num_msgs;  $i++ ) {
+  my $header = join "", @{$pop->top($i)};
+
+  for ($header) {
+   next MESSAGE unless
+    /^from:.*someone\@somewhere.net/im &&
+    /^subject:\s*important stuff/im
+  }
+
+  my $fname = $mail_prefix."-".$$.++$mail_out_idx.".doc";
+  open (MAILOUT, ">$mail_dir/$fname")
+   or die "Can't open $mail_dir/$fname: $!";
+  # If the get() complains, you need the new libnet bundle
+  $pop->get($i, \*MAILOUT) or die "Can't read mail";
+  close MAILOUT or die "Error closing $mail_dir/$fname";
+  # If you want to delete the mail on the server
+  # $pop->delete($i);
+ }
+
+ close MAILOUT;
+ $pop->quit();
+
+ # Parse the mail message into separate mime entities
+ my $parser=new MIME::Parser;
+ $parser->output_dir("mimemail");
+
+ opendir(DIR, $mail_dir) or die "Can't open directory $mail_dir: $!";
+ my @files = map { $mail_dir."/".$_ } sort
+  grep { -f "$mail_dir/$_" and /$mail_prefix-$$-/o } readdir DIR;
+ closedir DIR;
+
+ for my $file ( @files ) {
+  my $entity=$parser->parse_in($file) or die "Couldn't parse mail";
+  print_tnef_parts($entity);
+  # If you want to delete the working files
+  # $entity->purge;
+ }
+
+ sub print_tnef_parts {
+  my $ent = shift;
+
+  if ( $ent->parts ) {
+   for my $sub_ent ( $ent->parts ) {
+    print_tnef_parts($sub_ent);
+   }
+  } elsif ( $ent->mime_type =~ /ms-tnef/i ) {
+
+   # Create a tnef object
+   my $tnef = Convert::TNEF->read_ent($ent,{output_dir=>"tnefmail"})
+    or die $Convert::TNEF::errstr;
+   for ($tnef->attachments) {
+    print "Title:",$_->name,"\n";
+    print "Data:\n",$_->data,"\n";
+   }
+
+   # If you want to delete the working files
+   # $tnef->purge;
+  }
+ }
+
+=head1 SEE ALSO
+
+perl(1), IO::Wrap(3), MIME::Parser(3), MIME::Entity(3), MIME::Body(3)
+
+=head1 CAVEATS
+
+ The parsing may depend on the endianness (see perlport) and width of
+ integers on the system where the TNEF file was created. If this proves
+ to be the case (check the debug output), I'll see what I can do
+ about it.
+
+=head1 AUTHOR
+
+ Douglas Wilson, dwilson@gtemail.net
+
+=cut

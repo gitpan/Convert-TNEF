@@ -1,5 +1,10 @@
 Revision history for Perl extension Convert::TNEF.
 
+0.11  Tue May 29 2001
+        - Moved previously 'autoload' functions so that they're all
+          just loaded. Its a small module anyway, so there was no real
+          need for it, and it should cut down on problems for people who
+          don't install this module properly :)
 0.10  Wed Jan 17 2001
         - Stripped carriage returns from all files (last edit was
           on Windows).
