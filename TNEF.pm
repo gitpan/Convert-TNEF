@@ -27,7 +27,7 @@ use IO::Wrap;
 use File::Spec;
 use MIME::Body;
 
-$VERSION = '0.17';
+$VERSION = '0.18';
 
 # Set some TNEF constants. Everything turned
 # out to be in little endian order, so I just added
@@ -484,6 +484,7 @@ sub longname {
   my $data = $self->data("Attachment");
   return unless $data;
   my $pos = index( $data, pack( "H*", "1e00013001" ) );
+  $pos = index( $data, pack( "H*", "1e00073701" ) ) if ($pos < 0);
   return $self->name unless $pos >= 0;
   my $len = unpack( "V", substr( $data, $pos + 8, 4 ) );
   my $longname = substr( $data, $pos + 12, $len );

@@ -4,5 +4,5 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
     'NAME'         => 'Convert::TNEF',
     'VERSION_FROM' => 'TNEF.pm', # finds $VERSION
-    'PREREQ_PM'    => { 'MIME::Body' => 4.109 },
+    'PREREQ_PM'    => { 'MIME::Body' => 4.109, 'IO::Wrap' => 0 },
 );

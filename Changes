@@ -1,5 +1,9 @@
 Revision history for Perl extension Convert::TNEF.
 
+0.18  Mon Jul 23 2012
+        - Add IO::Wrap dependency to Makefile.PL (RT78412).
+        - Change longname() to detect names in newer versions of Outlook.
+          (RT78484)
 0.17  Sun Feb 24 2001
         - It appears that messages no longer need start with a
           TnefVersion attribute, and a message without this attribute
